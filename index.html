@@ -1,0 +1,525 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/css/bootstrap.min.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.0/js/bootstrap.min.js"></script>
+
+    <script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=requestAnimationFrame,Element.prototype.classList,URL"></script>
+    <script type="text/javascript">
+      function clearAll(){
+        var select=document.getElementById("request_wms");
+        /*for(var i=6;i>0;i--){
+        /  select.removeChild(select.options[i]);
+        }*/
+        document.getElementById("wms_textarea_label").innerHTML="XML response:";
+        document.getElementById("wms_textarea").value="";
+      }
+      function clearAllWFS(){
+        var select=document.getElementById("request_wms");
+        /*for(var i=6;i>0;i--){
+        //  select.removeChild(select.options[i]);
+        }*/
+        document.getElementById("wfs_textarea_label").innerHTML="XML response:";
+        document.getElementById("wfs_textarea").value="";
+      }
+
+
+      function makeGetCapabilitesRequest(){
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+          if(this.readyState==4 && this.status==200){
+            parseCapabilitesResponse(this);
+          }
+        };
+        xhttp.open("GET","http://localhost:8080/geoserver/wms?service=wms&version=1.1.1&request=GetCapabilities",true);
+        xhttp.send();
+      }
+
+      function parseCapabilitesResponse(xmlDocument){
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        var noOfRequests=xmlDoc.getElementsByTagName("Request")[0].childElementCount;
+        console.log(noOfRequests);
+        for(var i=0;i<noOfRequests*2;i++){
+          var temp=document.getElementById("request");
+          var newOption=document.createElement("option");
+          if(xmlDoc.getElementsByTagName("Request")[0].childNodes[i].tagName!=undefined){
+            newOption.text=xmlDoc.getElementsByTagName("Request")[0].childNodes[i].tagName;
+            newOption.value=xmlDoc.getElementsByTagName("Request")[0].childNodes[i].tagName;
+            var select=document.getElementById("request_wms");
+            select.appendChild(newOption);
+
+          }
+        }
+        var noOfLayers=xmlDoc.getElementsByTagName("Layer").length;
+        console.log(noOfLayers)
+        var layers=xmlDoc.getElementsByTagName("Layer");
+        for(var i=3;i<noOfLayers;i++){
+          var newOption=document.createElement("option");
+          if(layers[i].tagName!=undefined){
+            newOption.text=layers[i].getElementsByTagName("Title")[0].innerHTML;
+            newOption.value=layers[i].getElementsByTagName("Title")[0].innerHTML;
+            var select=document.getElementById("layer_wms");
+            select.appendChild(newOption);
+
+          }
+        }
+        document.getElementById("wms_textarea_label").innerHTML="XML response for GetCapabilities:";
+        document.getElementById("wms_textarea").value=xmlDocument.responseText;
+
+      }
+
+      
+      
+      function makeRequestForCoordinateSystems(){
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+          if(this.readyState==4 && this.status==200){
+            getCoordinateSystem(this);
+            getBoundingBoxRequest(this);
+          }
+        };
+        xhttp.open("GET","http://localhost:8080/geoserver/wms?service=wms&version=1.1.1&request=GetCapabilities",true);
+        xhttp.send();
+      }
+
+      function getCoordinateSystem(xmlDocument) {
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        var layerSelect=document.getElementById("layer_wms");
+        var selectedLayer=layerSelect.options[layerSelect.selectedIndex].value;
+        console.log(selectedLayer);
+        var noOfLayers=xmlDoc.getElementsByTagName("Layer").length;
+        console.log(noOfLayers)
+        var layers=xmlDoc.getElementsByTagName("Layer");
+        var temp=0;
+        for(var i=0;i<noOfLayers;i++){
+          var newOption=document.createElement("option");
+          if(layers[i].tagName!=undefined){
+            if(layers[i].getElementsByTagName("Title")[0].innerHTML===selectedLayer)
+              temp=i;
+          }
+        }
+        console.log(temp);
+        console.log(layers[temp].getElementsByTagName("Title")[0].innerHTML)
+        var srsOfSelectedLayer=layers[temp].getElementsByTagName("SRS");
+        console.log("no of srs:"+srsOfSelectedLayer.length);
+        for(var i=0;i<srsOfSelectedLayer.length;i++){
+          var newOption=document.createElement("option");
+          if(srsOfSelectedLayer[i].innerHTML!=undefined){
+            newOption.text=srsOfSelectedLayer[i].innerHTML;
+            newOption.value=srsOfSelectedLayer[i].innerHTML;
+            var select=document.getElementById("crs_wms");
+            select.appendChild(newOption);
+
+          }
+        }
+
+      }
+      function getBoundingBoxRequest(xmlDocument){
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        
+        var layerSelect=document.getElementById("layer_wms");
+        var selectedLayer=layerSelect.options[layerSelect.selectedIndex].value;
+        console.log("title of selectedLayer:"+selectedLayer);
+        var noOfLayers=xmlDoc.getElementsByTagName("Layer").length;
+        console.log(noOfLayers)
+        var layers=xmlDoc.getElementsByTagName("Layer");
+        var temp=0;
+        var minY=0;
+        var minX=0;
+        var maxY=0;
+        var maxX=0;
+        var crs_wms="crs";
+        console.log("here3:getBoundingBoxRequest")
+        for(var i=0;i<noOfLayers;i++){
+          if(layers[i].tagName!=undefined){
+            if(layers[i].getElementsByTagName("Title")[0].innerHTML===selectedLayer){
+              temp=i;
+              crs_wms=layers[temp].getElementsByTagName("BoundingBox")[0].getAttribute("SRS");
+              console.log(crs_wms);
+              minY=layers[temp].getElementsByTagName("BoundingBox")[0].getAttribute("miny");
+              minX=layers[temp].getElementsByTagName("BoundingBox")[0].getAttribute("minx");
+              maxY=layers[temp].getElementsByTagName("BoundingBox")[0].getAttribute("maxy");
+              maxX=layers[temp].getElementsByTagName("BoundingBox")[0].getAttribute("maxx");
+              console.log("minX:"+minX);
+              console.log("minY:"+minY);
+              console.log("maxX:"+maxX);
+              console.log("maxY:"+maxY);
+
+            }
+
+          }
+        }
+        document.getElementById("minX").value=minX;
+        document.getElementById("minY").value=minY;
+        document.getElementById("maxX").value=maxX;
+        document.getElementById("maxY").value=maxY;
+        var index=0;
+        var crs_input=document.getElementById("crs_wms").options;
+        for(var i=0;i<crs_input.length;i++){
+          if(crs_input[i].value==crs_wms){
+            document.getElementById("crs_wms").value=crs_wms;
+            console.log("crs:"+i);
+          }
+        }
+
+      }
+
+      function makeWFSGetCapabilitesRequest(){
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+          if(this.readyState==4 && this.status==200){
+            parseWFSCapabilitesResponse(this);
+          }
+        };
+        xhttp.open("GET","http://localhost:8080/geoserver/wfs?service=wfs&version=1.1.1&request=GetCapabilities",true);
+        xhttp.send();
+      }
+
+      function parseWFSCapabilitesResponse(xmlDocument){
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        document.getElementById("wfs_textarea_label").innerHTML="XML response for GetCapabilities:";
+        document.getElementById("wfs_textarea").value=xmlDocument.responseText;
+        var operations=xmlDoc.getElementsByTagName("ows:Operation");
+        console.log(operations);
+        for(var i=0;i<operations.length;i++){
+          var newOption=document.createElement("option");
+          if(operations[i].innerHTML!=undefined){
+            newOption.text=operations[i].getAttribute("name");
+            newOption.value=operations[i].getAttribute("name");
+            var select=document.getElementById("request_wfs");
+            select.appendChild(newOption);
+
+          }
+        }
+        var features=xmlDoc.getElementsByTagName("FeatureType");
+        for(var i=0;i<features.length;i++){
+          var newOption=document.createElement("option");
+          if(features[i].innerHTML!=undefined){
+            newOption.text=features[i].getElementsByTagName("Title")[0].innerHTML;
+            newOption.value=features[i].getElementsByTagName("Title")[0].innerHTML;
+            var select=document.getElementById("featureType_wfs");
+            select.appendChild(newOption);
+
+          } 
+        }
+      }
+      function WCSchoose(){
+
+      }
+      function makeWCSGetCapabilitesRequest(){
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+          if(this.readyState==4 && this.status==200){
+            parseWCSCapabilitesResponse(this);
+          }
+        };
+        var serverChosen=document.getElementById("server_wms").value;
+        var link="";
+      	if(serverChosen==="Bhuvan"){
+      		link="https://bhuvan-vec2.nrsc.gov.in/bhuvan/wms";
+      	}
+      	else{
+      		link="http://localhost:8080/geoserver/wcs?service=wcs&version=1.1.1&request=GetCapabilities";
+      	}
+        xhttp.open("GET",link,true);
+        xhttp.send();
+      }
+      function parseWCSCapabilitesResponse(xmlDocument){
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        document.getElementById("wcs_textarea_label").innerHTML="XML response for GetCapabilities:";
+        document.getElementById("wcs_textarea").value=xmlDocument.responseText;
+        var requests=xmlDoc.getElementsByTagName("ows:Operation");
+        for(var i=0;i<requests.length;i++){
+          var newOption=document.createElement("option");
+          if(requests[i].innerHTML!=undefined){
+            newOption.text=requests[i].getAttribute("name");
+            newOption.value=requests[i].getAttribute("name");
+            var select=document.getElementById("request_wcs");
+            select.appendChild(newOption);
+
+          }
+        }
+        var identifiers=xmlDoc.getElementsByTagName("wcs:Identifier");
+        for(var i=1;i<identifiers.length;i++){
+          var newOption=document.createElement("option");
+          if(identifiers[i].innerHTML!=undefined){
+            newOption.text=identifiers[i].innerHTML;
+            newOption.value=identifiers[i].innerHTML;
+            var select=document.getElementById("layer_wcs");
+            select.appendChild(newOption);
+
+          } 
+        }
+      }
+
+      function submitWCS(){
+        /*var featureSelect=document.getElementById("request_wcs"); 
+        var selectedRequest=featureSelect.options[featureSelect.selectedIndex].value;
+        console.log("Coverage request:"+selectedrequest);
+        if(selectedrequest==="GetCoverage"){
+        */  getCoverageKun();
+        /*}
+        else{
+          console.log("not Coverage");
+        }*/
+        
+      }
+
+      function getCoverageKun(){
+        console.log("here");
+        var xhttp=new XMLHttpRequest();
+        xhttp.onreadystatechange=function(){
+          if(this.readyState==4 && this.status==200){
+            getCoverageRequest(this);
+          }
+        };
+        xhttp.open("GET","http://localhost:8080/geoserver/wcs?service=wcs&version=1.1.1&request=GetCapabilities",true);
+        xhttp.send();
+      }
+
+      function getCoverageRequest(xmlDocument){
+        var responseParser=new DOMParser();
+        var xmlDoc=responseParser.parseFromString(xmlDocument.responseText,"application/xml");
+        var featureSelect=document.getElementById("layer_wcs");
+        var selectedfeature=featureSelect.options[featureSelect.selectedIndex].value;
+        console.log(selectedfeature);
+
+        var request="http://localhost:8080/geoserver/wcs?SERVICE=WCS&REQUEST=GetCoverage&VERSION=2.0.1&CoverageId="+selectedfeature+"&compression=LZW&tiling=true&tileheight=256&tilewidth=256";
+        var win = window.open(request, '_blank');
+          win.focus();
+      }
+
+      
+    </script>
+    <title>
+      Real Estate Selector
+    </title>
+  </head>
+  <body>
+    <!--title-->
+    <div id="sandeepan_header" align="center" style="margin: 0.5%;padding: 0.5%;">
+      <h3>
+        Searching for underdeveloped real estate through GIS
+      </h3>
+    </div>
+    <!--form for data collection-->
+    <div id="sandeepan_left" align="center" style="width:45%;margin: 0.5%;padding: 0.5%;float: left;">
+      <!--tab navigator-->
+      <ul class="nav nav-tabs">
+        <li class="active"><a data-toggle="tab" href="#wms">WMS</a></li>
+        <li><a data-toggle="tab" href="#wfs">WFS</a></li>
+        <li><a data-toggle="tab" href="#wcs">WCS</a></li>
+      </ul>
+      <!--tabs-->
+      <div class="tab-content">
+        <!--wms-->
+        <div id="wms" class="tab-pane fade in active">
+          <h3>WMS</h3>
+          <!--wms form collects data for wms request-->
+          <div id="wms_form" style="width:45%;margin: 0.5%;padding: 0.5%;">
+            <form>
+              <div class="form-group">
+                <label for="server_wms" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Server:
+                </label>
+                <select id="server_wms" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="makeGetCapabilitesRequest()" onfocus="clearAll()">
+                  <option value="Geoserver">
+                    Geoserver
+                  </option value="Bhuvan">
+                  <option>
+                    Bhuvan
+                  </option>
+                </select>
+                <label for="request_wms" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Request:
+                </label>
+                <select id="request_wms" class="form-control" style="margin: 3%;padding: 2.5%;">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+                <label for="layer_wms" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Layers:
+                </label>
+                <select id="layer_wms" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="makeRequestForCoordinateSystems()">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+                <label for="crs_wms" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Coordinate Reference System:
+                </label>
+                <select id="crs_wms" class="form-control" style="margin: 3%;padding: 2.5%;">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+              </div>
+            </form>
+            <label id="minX_label" for="minX" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+              MinX: 
+            </label>
+            <input type="text" id="minX" size="4">
+            
+            <label id="minX_label" for="maxX" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+              MaxX:
+            </label>
+            <input type="text" id="maxX" size="4">
+            <br>
+            <label id="minX_label" for="minY" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+              MinY: 
+            </label>
+            <input type="text" id="minY" size="4">
+            
+            <label id="minX_label" for="maxY" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+              MaxY:
+            </label>
+            <input type="text" id="maxY" size="4">
+            
+            <br>
+
+            <button id="wms_request_button" type="button" class="btn btn-primary" onclick="//wmsSubmit()" style="margin: 3%;padding: 2.5%;">
+              Send WMS Request
+            </button>
+              
+          </div>
+          <!--displays XMl from a wms reqeust response-->
+          <div id="wms_xmlspace">
+            <form>
+              <div class="form-group" align="center">
+                <label id="wms_textarea_label" for="response_wms" style="margin-top: 0%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 0%;padding-bottom: 0.5%">
+                  XML response:
+                </label>
+                <br>
+                <textarea id="wms_textarea" rows="8" cols="80">
+                </textarea>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!--wfs-->
+        <div id="wfs" class="tab-pane fade">
+          <h3>WFS</h3>
+          <div id="wfs_form" style="width:45%;margin: 0.5%;padding: 0.5%;">
+            <form>
+              <div class="form-group">
+                <label for="server_wfs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Server:
+                </label>
+                <select id="server_wfs" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="makeWFSGetCapabilitesRequest()" onfocus="clearAllWFS()">
+                  <option value="Geoserver">
+                    Geoserver
+                  </option value="NDBC">
+                </select>
+                <label for="request_wfs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Request:
+                </label>
+                <select id="request_wfs" class="form-control" style="margin: 3%;padding: 2.5%;">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+                <label for="featureType_wfs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Feature type:
+                </label>
+                <select id="featureType_wfs" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="makeRequestForCoordinateSystems()">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+                
+                
+                <button id="wfs_request_button" type="button" class="btn btn-primary" onclick="//wfsSubmit()" style="margin: 3%;padding: 2.5%;">
+                  Send Request
+                </button>
+              </div>
+
+            </form>
+          </div>
+          <div id="wfs_xmlspace">
+            <form>
+              <div class="form-group" align="center">
+                <label id="wfs_textarea_label" for="response_wms" style="margin-top: 0%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 0%;padding-bottom: 0.5%">
+                  XML response:
+                </label>
+                <br>
+                <textarea id="wfs_textarea" rows="8" cols="80">
+                </textarea>
+              </div>
+            </form>
+          </div>
+        </div>
+        <!--wcs-->
+        <div id="wcs" class="tab-pane fade">
+          <h3>WCS</h3>
+          <div id="wcs_form" style="width:45%;margin: 0.5%;padding: 0.5%;">
+            <form>
+              <div class="form-group">
+                <label for="server_wcs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Server:
+                </label>
+                <select id="server_wcs" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="makeWCSGetCapabilitesRequest()" onfocus="clearAll()">
+                  <option value="Geoserver">
+                    Geoserver
+                  </option>
+                </select>
+                <label for="request_wcs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Request:
+                </label>
+                <select id="request_wcs" class="form-control" style="margin: 3%;padding: 2.5%;">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+                <label for="layer_wcs" style="margin-top: 3%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 2.5%;padding-bottom: 0.5%">
+                  Layers:
+                </label>
+                <select id="layer_wcs" class="form-control" style="margin: 3%;padding: 2.5%;" onblur="">
+                  <option value="0">
+                    None
+                  </option>
+                </select>
+              </div>
+            </form>
+            
+            <button id="wcs_request_button" type="button" class="btn btn-primary" onclick="submitWCS()" style="margin: 3%;padding: 2.5%;">
+              Send Request
+            </button>
+              
+          </div>
+          <div id="wcs_xmlspace">
+            <form>
+              <div class="form-group" align="center">
+                <label id="wcs_textarea_label" for="response_wms" style="margin-top: 0%;margin-right: 3%;margin-left: 3%;margin-bottom: 0%;padding: 0%;padding-bottom: 0.5%">
+                  XML response:
+                </label>
+                <br>
+                <textarea id="wcs_textarea" rows="8" cols="80">
+                </textarea>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!--map window-->
+    <div id="sandeepan_right" align="center" style="margin: 0.5%;padding: 0.5%;float: right;">
+      <div id="map" style="width: 950px;height: 820px;"></div>
+      <script src="./index.js"></script>
+      
+    </div>
+    
+    <!--footer for anything else-->
+    <div id="sandeepan_footer" align="center" style="margin: 0.5%;padding: 0.5%;float: bottom;">
+
+    </div>
+  </body>
+</html>
